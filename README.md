@@ -1,103 +1,156 @@
 #include <iostream>
 #include <stdexcept>
-#include <cstring> // for strcpy and strlen
+#include <cstring>
+#include <cmath>
 
-enum class StanDostepnosci { dostepny, niedostepny };
+enum class StanDopuszczenia { dopuszczony, niedopuszczony };
 
-class Autor {
-private:
-    const char* nazwisko_;
+class Wlasciciel {
 public:
-    Autor(const char* nazwisko) : nazwisko_(nazwisko) {}
-    const char* getPodajNazwisko() const { return nazwisko_; }
-    void setUstawNazwisko(const char* nazwisko) { nazwisko_ = nazwisko; }
+    // Pusta klasa Wlasciciel
 };
 
-class Ksiazka {
+class Samochod {
+private:
+    char numerRejestracyjny_[20];
+    int stanLicznika_;
+    StanDopuszczenia stanDopuszczenia_;
+    const Wlasciciel& wlasciciel_;
+    static Samochod* wzorcowy_;
+    static constexpr double WAR_POCZ = 10000.0;
+
 protected:
-    const char* tytul_;
-    StanDostepnosci stan_;
-    int liczbaStron_;
-    const Autor& autor_;
-    static Ksiazka* wzorcowa_;
+    // Getter dla właściciela, niezmienialny
+    const Wlasciciel& getWlasciciel() const { return wlasciciel_; }
+
 public:
-    Ksiazka(const char* tytul, StanDostepnosci stan, int liczbaStron, const Autor& autor)
-        : tytul_(tytul), stan_(stan), liczbaStron_(liczbaStron), autor_(autor) {}
+    Samochod(const char* numerRejestracyjny, int stanLicznika, StanDopuszczenia stanDopuszczenia, const Wlasciciel& wlasciciel)
+        : wlasciciel_(wlasciciel) {
+        setNumerRejestracyjny(numerRejestracyjny);
+        setStanLicznika(stanLicznika);
+        stanDopuszczenia_ = stanDopuszczenia;
+    }
 
-    Ksiazka() {
-        if (wzorcowa_ == nullptr) {
-            throw std::runtime_error("Nie można utworzyć instancji bez wzorcowej książki.");
+    Samochod() : wlasciciel_(wzorcowy_->wlasciciel_) {
+        if (!wzorcowy_) {
+            throw std::runtime_error("Wzorcowy samochod nie jest ustawiony.");
         }
-        *this = *wzorcowa_;
+        *this == *wzorcowy_;
     }
 
-    const char* getPodajTytul() const { return tytul_; }
-    StanDostepnosci getPodajStan() const { return stan_; }
-    int getPodajLiczbeStron() const { return liczbaStron_; }
-    const Autor& getPodajAutora() const { return autor_; }
+    static void setWzorcowy(Samochod* wzorcowy) {
+        wzorcowy_ = wzorcowy;
+    }
 
-    void setUstawTytul(const char* tytul) { tytul_ = tytul; }
-    void setUstawStan(StanDostepnosci stan) { stan_ = stan; }
+    // Settery i gettery
+    const char* getNumerRejestracyjny() const { return numerRejestracyjny_; }
+    void setNumerRejestracyjny(const char* numerRejestracyjny) {
+        strncpy_s(numerRejestracyjny_, numerRejestracyjny, sizeof(numerRejestracyjny_) - 1);
+        numerRejestracyjny_[sizeof(numerRejestracyjny_) - 1] = '\0';
+    }
 
-    void setUstawLiczbeStron(int liczbaStron) {
-        if (liczbaStron <= 0) {
-            throw std::invalid_argument("Liczba stron nie może być mniejsza bądź równa 0.");
+    int getStanLicznika() const { return stanLicznika_; }
+    void setStanLicznika(int stanLicznika) {
+        if (stanLicznika < 0) {
+            throw std::invalid_argument("Stan licznika nie może być ujemny.");
         }
-        liczbaStron_ = liczbaStron;
+        stanLicznika_ = stanLicznika;
     }
 
-    virtual double obliczCene() const {
-        return 1.0 * liczbaStron_;
+    StanDopuszczenia getStanDopuszczenia() const { return stanDopuszczenia_; }
+    void setStanDopuszczenia(StanDopuszczenia stanDopuszczenia) {
+        stanDopuszczenia_ = stanDopuszczenia;
     }
 
-    bool operator==(const Ksiazka& inna) const {
-        return (liczbaStron_ == inna.liczbaStron_ && stan_ == inna.stan_ && strcmp(autor_.getPodajNazwisko(), inna.autor_.getPodajNazwisko()) == 0);
+    double obliczWartosc(double WSP_SPARW) const {
+        double wartosc = (WAR_POCZ - 0.2 * stanLicznika_) * (stanDopuszczenia_ == StanDopuszczenia::dopuszczony ? WSP_SPARW : 0.2);
+        return std::max(wartosc, 400.0);
     }
 
-    static void UstawWzorcowa(Ksiazka* wzorcowa) {
-        wzorcowa_ = wzorcowa;
+    // Metoda wirtualna do obliczenia zasięgu
+    virtual double obliczZasieg() const {
+        if (stanDopuszczenia_ == StanDopuszczenia::niedopuszczony) {
+            throw std::runtime_error("Samochod jest niedopuszczony do jazdy.");
+        }
+        return 800.0;
+    }
+
+    bool operator==(const Samochod& inny) const {
+        return std::abs(stanLicznika_ - inny.stanLicznika_) <= 20 && stanDopuszczenia_ == inny.stanDopuszczenia_;
+    }
+
+    virtual operator double() const {
+        return obliczWartosc(1.0);
+    }
+
+    const char* opis() const {
+        static char opis[256];
+        snprintf(opis, sizeof(opis), "Numer rejestracyjny: %s, Stan licznika: %d, Stan dopuszczenia: %s",
+            numerRejestracyjny_,
+            stanLicznika_,
+            stanDopuszczenia_ == StanDopuszczenia::dopuszczony ? "dopuszczony" : "niedopuszczony");
+        return opis;
     }
 };
 
-Ksiazka* Ksiazka::wzorcowa_ = nullptr;
+Samochod* Samochod::wzorcowy_ = nullptr;
 
-class Ebook : public Ksiazka {
+class SamochodElektryczny : public Samochod {
 private:
-    int rozmiar_;
+    int stanBaterii_;
+
 public:
-    Ebook(const char* tytul, StanDostepnosci stan, int liczbaStron, const Autor& autor, int rozmiar)
-        : Ksiazka(tytul, stan, liczbaStron, autor), rozmiar_(rozmiar) {
-        if (rozmiar <= 0) {
-            throw std::invalid_argument("Rozmiar musi być większy od 0.");
+    SamochodElektryczny(const char* numerRejestracyjny, int stanLicznika, StanDopuszczenia stanDopuszczenia, const Wlasciciel& wlasciciel, int stanBaterii)
+        : Samochod(numerRejestracyjny, stanLicznika, stanDopuszczenia, wlasciciel), stanBaterii_(stanBaterii) {
+        if (stanBaterii < 0 || stanBaterii > 100) {
+            throw std::invalid_argument("Stan baterii musi być w przedziale 0-100%.");
         }
     }
 
-    int getPodajRozmiar() const { return rozmiar_; }
-    void setUstawRozmiar(int rozmiar) {
-        if (rozmiar <= 0) {
-            throw std::invalid_argument("Rozmiar musi być większy od 0.");
+    double obliczZasieg() const override {
+        if (getStanDopuszczenia() == StanDopuszczenia::niedopuszczony) {
+            throw std::runtime_error("Samochod jest niedopuszczony do jazdy.");
         }
-        rozmiar_ = rozmiar;
+        return 2.5 * stanBaterii_;
     }
 
-    double obliczCene() const override {
-        return Ksiazka::obliczCene() * 0.75;
+    double obliczWartosc(double WSP_SPARW) const  {
+        double wartosc = Samochod::obliczWartosc(WSP_SPARW) * 0.7;
+        return std::max(wartosc, 400.0);
+    }
+
+    operator double() const override {
+        return obliczWartosc(1.0);
+    }
+
+    const char* opis() const {
+        static char opis[256];
+        snprintf(opis, sizeof(opis), "Numer rejestracyjny: %s, Stan licznika: %d, Stan dopuszczenia: %s, Stan baterii: %d%%",
+            getNumerRejestracyjny(),
+            getStanLicznika(),
+            getStanDopuszczenia() == StanDopuszczenia::dopuszczony ? "dopuszczony" : "niedopuszczony",
+            stanBaterii_);
+        return opis;
     }
 };
 
 int main() {
     try {
-        Autor autor("Kowalski");
-        Ksiazka wzorcowa("Wzorcowy Tytul", StanDostepnosci::dostepny, 300, autor);
-        Ksiazka::UstawWzorcowa(&wzorcowa);
+        Wlasciciel wlasciciel;
 
-        Ksiazka nowaKsiazka;
-        std::cout << "Tytul: " << nowaKsiazka.getPodajTytul() << ", Stan: " << (nowaKsiazka.getPodajStan() == StanDostepnosci::dostepny ? "Dostepna" : "Niedostepna") << ", Liczba stron: " << nowaKsiazka.getPodajLiczbeStron() << ", Autor: " << nowaKsiazka.getPodajAutora().getPodajNazwisko() << std::endl;
+        Samochod wzorcowy("XYZ-12345", 100000, StanDopuszczenia::dopuszczony, wlasciciel);
+        Samochod::setWzorcowy(&wzorcowy);
 
-        Ebook ebook("Ebook Tytul", StanDostepnosci::dostepny, 150, autor, 50);
-        std::cout << "Cena ebooka: " << ebook.obliczCene() << " PLN" << std::endl;
+        Samochod nowySamochod;
+        std::cout << "Nowy Samochod: " << static_cast<double>(nowySamochod) << " PLN" << std::endl;
+        std::cout << "Opis: " << nowySamochod.opis() << std::endl;
 
-    } catch (const std::exception& e) {
+        SamochodElektryczny elektryczny("ELE-98765", 50000, StanDopuszczenia::dopuszczony, wlasciciel, 80);
+        std::cout << "Samochod Elektryczny: " << static_cast<double>(elektryczny) << " PLN" << std::endl;
+        std::cout << "Opis: " << elektryczny.opis() << std::endl;
+
+    }
+    catch (const std::exception& e) {
         std::cerr << "Blad: " << e.what() << std::endl;
     }
 
