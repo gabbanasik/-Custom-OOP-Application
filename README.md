@@ -1,144 +1,140 @@
 #include <iostream>
-#include <cstring>
 #include <stdexcept>
-#include <algorithm>
-
-using namespace std;
-
-class Wlasciciel {
-    string nazwisko;
+#include <cstring> // for strcpy and strlen
+    enum class Stan { DOSTEPNA, NIEDOSTEPNA };
+class Autor {
 public:
-    Wlasciciel(const string& nazwisko) : nazwisko(nazwisko) {}
-    const string& getNazwisko() const { return nazwisko; }
+    Autor(const char* nazwisko) : nazwisko_(nazwisko) {}
+
+    const char* PobierzNazwisko() const { return nazwisko_; }
+
+private:
+    const char* nazwisko_;
 };
 
-class Samochod {
-    char numerRejestracyjny[10]; // XXX-YYYYY
-    double stanLicznika;
-    bool dopuszczonyDoJazdy;
-    Wlasciciel* wlasciciel;
-    static int ostatniNumer;
-
-    void generujNumerRejestracyjny(const char* XXX) {
-        if (strlen(XXX) != 3) {
-            throw invalid_argument("XXX must be 3 characters long");
-        }
-        strncpy_s(numerRejestracyjny, XXX, 3);
-        numerRejestracyjny[3] = '-';
-        snprintf(numerRejestracyjny + 4, 6, "%05d", ++ostatniNumer);
-    }
-
+class Ksiazka {
 public:
-    Samochod(const char* XXX, double stanLicznika, bool dopuszczonyDoJazdy, Wlasciciel* wlasciciel)
-        : stanLicznika(stanLicznika), dopuszczonyDoJazdy(dopuszczonyDoJazdy), wlasciciel(wlasciciel) {
-        generujNumerRejestracyjny(XXX);
+
+
+    // Konstruktor argumentowy
+    Ksiazka(const char* tytul, int liczbaStron, Stan stanDostepnosci, const Autor& autor)
+        : autor_(autor) {
+        UstawTytul(tytul);
+        UstawLiczbeStron(liczbaStron);
+        UstawStanDostepnosci(stanDostepnosci);
     }
 
-    const char* getNumerRejestracyjny() const {
-        return numerRejestracyjny;
-    }
+    // Konstruktor domyślny
+    Ksiazka() : Ksiazka(wzorcowa_->tytul_, wzorcowa_->liczbaStron_, wzorcowa_->stanDostepnosci_, wzorcowa_->autor_) {}
 
-    double getStanLicznika() const {
-        return stanLicznika;
-    }
+    // Gettery
+    const char* PobierzTytul() const { return tytul_; }
+    int PobierzLiczbeStron() const { return liczbaStron_; }
+    Stan PobierzStanDostepnosci() const { return stanDostepnosci_; }
+    const Autor& PobierzAutora() const { return autor_; }
 
-    void setStanLicznika(double stan) {
-        if (stan < 0) {
-            throw invalid_argument("Stan licznika cannot be negative");
+    // Settery
+    void UstawTytul(const char* tytul) {
+        if (strlen(tytul) == 0) {
+            throw std::invalid_argument("Tytul nie moze byc pusty.");
         }
-        stanLicznika = stan;
+        tytul_ = tytul;
     }
 
-    bool isDopuszczonyDoJazdy() const {
-        return dopuszczonyDoJazdy;
+    void UstawLiczbeStron(int liczbaStron) {
+        if (liczbaStron <= 0) {
+            throw std::invalid_argument("Liczba stron musi byc dodatnia.");
+        }
+        liczbaStron_ = liczbaStron;
     }
 
-    void setDopuszczonyDoJazdy(bool stan) {
-        dopuszczonyDoJazdy = stan;
+    void UstawStanDostepnosci(Stan stanDostepnosci) {
+        stanDostepnosci_ = stanDostepnosci;
     }
 
-    const Wlasciciel* getWlasciciel() const {
-        return wlasciciel;
+    static void UstawWzorcowa(Ksiazka* wzorcowa) {
+        wzorcowa_ = wzorcowa;
     }
 
-    void setWlasciciel(Wlasciciel* wlasc) {
-        wlasciciel = wlasc;
+    virtual double ObliczCene() const {
+        return 1.0 * liczbaStron_;
     }
 
-    virtual double obliczZasieg() const {
-        return 800;
+    explicit operator const char*() const {
+        static char opis[256];
+        snprintf(opis, sizeof(opis), "Tytul: %s, Liczba stron: %d, Stan: %s, Autor: %s",
+                 tytul_, liczbaStron_, 
+                 (stanDostepnosci_ == Stan::DOSTEPNA ? "Dostepna" : "Niedostepna"), 
+                 autor_.PobierzNazwisko());
+        return opis;
     }
 
-    operator double() const {
-        const double WARTOSC_POCZ = 50000;
-        double WSP_SPRAW = dopuszczonyDoJazdy ? 1.0 : 0.2;
-        double wartosc = WARTOSC_POCZ - 0.1 * stanLicznika * WSP_SPRAW;
-        return max(wartosc, 400.0);
+    bool operator==(const Ksiazka& other) const {
+        return (liczbaStron_ == other.liczbaStron_ &&
+                stanDostepnosci_ == other.stanDostepnosci_ &&
+                strcmp(autor_.PobierzNazwisko(), other.autor_.PobierzNazwisko()) == 0);
     }
 
-    bool operator==(const Samochod& other) const {
-        return strncmp(numerRejestracyjny, other.numerRejestracyjny, 3) == 0 &&
-               abs(stanLicznika - other.stanLicznika) <= 10;
-    }
-
-    friend ostream& operator<<(ostream& os, const Samochod& s) {
-        os << "[" << s.getNumerRejestracyjny() << "] "
-           << s.getWlasciciel()->getNazwisko() << " : "
-           << s.getStanLicznika() << " km, "
-           << (s.isDopuszczonyDoJazdy() ? "dopuszczony" : "niedopuszczony");
-        return os;
-    }
+protected:
+    const char* tytul_;
+    int liczbaStron_;
+    Stan stanDostepnosci_;
+    const Autor& autor_;
+    static Ksiazka* wzorcowa_;
 };
 
-int Samochod::ostatniNumer = 0;
-
-class SamochodElektryczny : public Samochod {
-    double stanBaterii; // 0-100%
-
+Ksiazka* Ksiazka::wzorcowa_ = nullptr;
+class EBook : public Ksiazka {
 public:
-    SamochodElektryczny(const char* XXX, double stanLicznika, bool dopuszczonyDoJazdy, Wlasciciel* wlasciciel, double stanBaterii)
-        : Samochod(XXX, stanLicznika, dopuszczonyDoJazdy, wlasciciel), stanBaterii(stanBaterii) {
-        if (stanBaterii < 0 || stanBaterii > 100) {
-            throw invalid_argument("Stan baterii must be between 0 and 100");
+    EBook(const char* tytul, int liczbaStron, Stan stanDostepnosci, const Autor& autor, double rozmiarMB)
+        : Ksiazka(tytul, liczbaStron, stanDostepnosci, autor), rozmiarMB_(rozmiarMB) {
+        if (rozmiarMB <= 0) {
+            throw std::invalid_argument("Rozmiar w MB musi byc dodatni.");
         }
     }
 
-    double getStanBaterii() const {
-        return stanBaterii;
-    }
+    double PobierzRozmiarMB() const { return rozmiarMB_; }
 
-    void setStanBaterii(double stan) {
-        if (stan < 0 || stan > 100) {
-            throw invalid_argument("Stan baterii must be between 0 and 100");
+    void UstawRozmiarMB(double rozmiarMB) {
+        if (rozmiarMB <= 0) {
+            throw std::invalid_argument("Rozmiar w MB musi byc dodatni.");
         }
-        stanBaterii = stan;
+        rozmiarMB_ = rozmiarMB;
     }
 
-    virtual double obliczZasieg() const override {
-        return 2.5 * stanBaterii;
+    double ObliczCene() const override {
+        return Ksiazka::ObliczCene() * 0.75;
     }
+
+private:
+    double rozmiarMB_;
 };
-
 int main() {
-    Wlasciciel wlasciciel1("Kowalski");
-    Wlasciciel wlasciciel2("Nowak");
+    Autor autor("Kowalski");
+    Ksiazka wzorcowaKsiazka("Wzorcowy Tytul", 300, Ksiazka::Stan::DOSTEPNA, autor);
+    Ksiazka::UstawWzorcowa(&wzorcowaKsiazka);
 
-    Samochod samochod1("ABC", 15000, true, &wlasciciel1);
-    Samochod samochod2("XYZ", 12000, false, &wlasciciel2);
+    try {
+        Ksiazka nowaKsiazka;
+        std::cout << static_cast<const char*>(nowaKsiazka) << std::endl;
+    } catch (const std::exception& e) {
+        std::cerr << "Blad: " << e.what() << std::endl;
+    }
 
-    SamochodElektryczny samochodElektryczny("ELE", 8000, true, &wlasciciel1, 80);
+    Ksiazka innaKsiazka("Inny Tytul", 250, Ksiazka::Stan::NIEDOSTEPNA, autor);
+    EBook ebook("Ebook Tytul", 150, Ksiazka::Stan::DOSTEPNA, autor, 50.0);
 
-    cout << samochod1 << endl;
-    cout << samochod2 << endl;
-    cout << samochodElektryczny << endl;
+    std::cout << "Cena ksiazki: " << innaKsiazka.ObliczCene() << " PLN" << std::endl;
+    std::cout << "Cena ebooka: " << ebook.ObliczCene() << " PLN" << std::endl;
 
-    cout << "Zasieg samochodu: " << samochod1.obliczZasieg() << " km" << endl;
-    cout << "Zasieg samochodu elektrycznego: " << samochodElektryczny.obliczZasieg() << " km" << endl;
+    std::cout << static_cast<const char*>(innaKsiazka) << std::endl;
+    std::cout << static_cast<const char*>(ebook) << std::endl;
 
-    cout << "Wartosc samochodu 1: " << static_cast<double>(samochod1) << " PLN" << endl;
-    cout << "Wartosc samochodu 2: " << static_cast<double>(samochod2) << " PLN" << endl;
-
-    cout << "Samochod 1 i 2 sa " << (samochod1 == samochod2 ? "takie same" : "rozne") << endl;
+    if (innaKsiazka == wzorcowaKsiazka) {
+        std::cout << "Ksiazki sa identyczne." << std::endl;
+    } else {
+        std::cout << "Ksiazki nie sa identyczne." << std::endl;
+    }
 
     return 0;
 }
