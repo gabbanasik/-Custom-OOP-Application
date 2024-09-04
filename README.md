@@ -1,158 +1,199 @@
 #include <iostream>
-#include <stdexcept>
 #include <cstring>
-#include <cmath>
+#include <stdexcept>
+#include <cctype> // do funkcji isdigit
 
-enum class StanDopuszczenia { dopuszczony, niedopuszczony };
-
-class Wlasciciel {
-public:
-    // Pusta klasa Wlasciciel
-};
-
-class Samochod {
+class Klient {
 private:
-    char numerRejestracyjny_[20];
-    int stanLicznika_;
-    StanDopuszczenia stanDopuszczenia_;
-    const Wlasciciel& wlasciciel_;
-    static Samochod* wzorcowy_;
-    static constexpr double WAR_POCZ = 10000.0;
-
-protected:
-    // Getter dla właściciela, niezmienialny
-    const Wlasciciel& getWlasciciel() const { return wlasciciel_; }
+    char nazwa_[20];
 
 public:
-    Samochod(const char* numerRejestracyjny, int stanLicznika, StanDopuszczenia stanDopuszczenia, const Wlasciciel& wlasciciel)
-        : wlasciciel_(wlasciciel) {
-        setNumerRejestracyjny(numerRejestracyjny);
-        setStanLicznika(stanLicznika);
-        stanDopuszczenia_ = stanDopuszczenia;
-    }
-
-    Samochod() : wlasciciel_(wzorcowy_->wlasciciel_) {
-        if (!wzorcowy_) {
-            throw std::runtime_error("Wzorcowy samochod nie jest ustawiony.");
+    Klient(const char* nazwa) {
+        if (nazwa == nullptr || strlen(nazwa) == 0) {
+            throw std::invalid_argument("Nazwa klienta nie może być pusta.");
         }
-        *this == *wzorcowy_;
+        strncpy(nazwa_, nazwa, 19);
+        nazwa_[19] = '\0';
     }
 
-    static void setWzorcowy(Samochod* wzorcowy) {
-        wzorcowy_ = wzorcowy;
-    }
-
-    // Settery i gettery
-    const char* getNumerRejestracyjny() const { return numerRejestracyjny_; }
-    void setNumerRejestracyjny(const char* numerRejestracyjny) {
-        strncpy_s(numerRejestracyjny_, numerRejestracyjny, sizeof(numerRejestracyjny_) - 1);
-        numerRejestracyjny_[sizeof(numerRejestracyjny_) - 1] = '\0';
-    }
-
-    int getStanLicznika() const { return stanLicznika_; }
-    void setStanLicznika(int stanLicznika) {
-        if (stanLicznika < 0) {
-            throw std::invalid_argument("Stan licznika nie może być ujemny.");
-        }
-        stanLicznika_ = stanLicznika;
-    }
-
-    StanDopuszczenia getStanDopuszczenia() const { return stanDopuszczenia_; }
-    void setStanDopuszczenia(StanDopuszczenia stanDopuszczenia) {
-        stanDopuszczenia_ = stanDopuszczenia;
-    }
-
-    double obliczWartosc(double WSP_SPARW) const {
-        double wartosc = (WAR_POCZ - 0.2 * stanLicznika_) * (stanDopuszczenia_ == StanDopuszczenia::dopuszczony ? WSP_SPARW : 0.2);
-        return std::max(wartosc, 400.0);
-    }
-
-    // Metoda wirtualna do obliczenia zasięgu
-    virtual double obliczZasieg() const {
-        if (stanDopuszczenia_ == StanDopuszczenia::niedopuszczony) {
-            throw std::runtime_error("Samochod jest niedopuszczony do jazdy.");
-        }
-        return 800.0;
-    }
-
-    bool operator==(const Samochod& inny) const {
-        return std::abs(stanLicznika_ - inny.stanLicznika_) <= 20 && stanDopuszczenia_ == inny.stanDopuszczenia_;
-    }
-
-    virtual operator double() const {
-        return obliczWartosc(1.0);
-    }
-
-    const char* opis() const {
-        static char opis[256];
-        snprintf(opis, sizeof(opis), "Numer rejestracyjny: %s, Stan licznika: %d, Stan dopuszczenia: %s",
-            numerRejestracyjny_,
-            stanLicznika_,
-            stanDopuszczenia_ == StanDopuszczenia::dopuszczony ? "dopuszczony" : "niedopuszczony");
-        return opis;
+    const char* getNazwa() const {
+        return nazwa_;
     }
 };
 
-Samochod* Samochod::wzorcowy_ = nullptr;
+enum class Stan {
+    dostepne,
+    niedostepne
+};
 
-class SamochodElektryczny : public Samochod {
+class KontoBankowe {
 private:
-    int stanBaterii_;
+    char nrKonta_[27];
+    double stanKonta_;
+    Stan stan_;
+    Klient& klient_;
+    static int licznikAktywnych;
 
 public:
-    SamochodElektryczny(const char* numerRejestracyjny, int stanLicznika, StanDopuszczenia stanDopuszczenia, const Wlasciciel& wlasciciel, int stanBaterii)
-        : Samochod(numerRejestracyjny, stanLicznika, stanDopuszczenia, wlasciciel), stanBaterii_(stanBaterii) {
-        if (stanBaterii < 0 || stanBaterii > 100) {
-            throw std::invalid_argument("Stan baterii musi być w przedziale 0-100%.");
+    KontoBankowe(const char* nrKonta, double stanKonta, Stan stan, Klient& klient)
+        : stanKonta_(stanKonta), stan_(stan), klient_(klient) {
+        setNrKonta(nrKonta);
+
+        if (stanKonta_ < 0) {
+            throw std::invalid_argument("Stan konta nie może być ujemny.");
+        }
+
+        if (stan_ == Stan::dostepne) {
+            ++licznikAktywnych;
         }
     }
 
-    double obliczZasieg() const override {
-        if (getStanDopuszczenia() == StanDopuszczenia::niedopuszczony) {
-            throw std::runtime_error("Samochod jest niedopuszczony do jazdy.");
+    ~KontoBankowe() {
+        if (stan_ == Stan::dostepne) {
+            --licznikAktywnych;
         }
-        return 2.5 * stanBaterii_;
     }
 
-    double obliczWartosc(double WSP_SPARW) const  {
-        double wartosc = Samochod::obliczWartosc(WSP_SPARW) * 0.7;
-        return std::max(wartosc, 400.0);
+    // Gettery i settery
+    const char* getNrKonta() const {
+        return nrKonta_;
     }
 
-    operator double() const override {
-        return obliczWartosc(1.0);
+    void setNrKonta(const char* nrKonta) {
+        if (strlen(nrKonta) != 26) {
+            throw std::invalid_argument("Numer konta musi mieć dokładnie 26 cyfr.");
+        }
+        for (int i = 0; i < 26; ++i) {
+            if (!isdigit(nrKonta[i])) {
+                throw std::invalid_argument("Numer konta może zawierać tylko cyfry.");
+            }
+        }
+        strncpy(nrKonta_, nrKonta, 26);
+        nrKonta_[26] = '\0';
     }
 
-    const char* opis() const {
-        static char opis[256];
-        snprintf(opis, sizeof(opis), "Numer rejestracyjny: %s, Stan licznika: %d, Stan dopuszczenia: %s, Stan baterii: %d%%",
-            getNumerRejestracyjny(),
-            getStanLicznika(),
-            getStanDopuszczenia() == StanDopuszczenia::dopuszczony ? "dopuszczony" : "niedopuszczony",
-            stanBaterii_);
-        return opis;
+    double getStanKonta() const {
+        return stanKonta_;
+    }
+
+    void setStanKonta(double stanKonta) {
+        if (stanKonta < 0) {
+            throw std::invalid_argument("Stan konta nie może być ujemny.");
+        }
+        stanKonta_ = stanKonta;
+    }
+
+    Stan getStan() const {
+        return stan_;
+    }
+
+    void setStan(Stan stan) {
+        if (stan_ != stan) {
+            if (stan == Stan::dostepne) {
+                ++licznikAktywnych;
+            } else {
+                --licznikAktywnych;
+            }
+            stan_ = stan;
+        }
+    }
+
+    const Klient& getKlient() const {
+        return klient_;
+    }
+
+    static int getLicznikAktywnych() {
+        return licznikAktywnych;
+    }
+
+    virtual double prognoza() const {
+        return getStanKonta();
+    }
+
+    // Operator += do dodawania środków
+    KontoBankowe& operator+=(double kwota) {
+        if (kwota < 0) {
+            throw std::invalid_argument("Kwota nie może być ujemna.");
+        }
+        stanKonta_ += kwota;
+        return *this;
+    }
+
+    // Operator konwersji KontoBankowe ➔ double
+    operator double() const {
+        return getStanKonta();
+    }
+
+    // Operator << do wyświetlania informacji o koncie
+    friend std::ostream& operator<<(std::ostream& os, const KontoBankowe& konto) {
+        os << "Konto: " << konto.nrKonta_ << ", Stan: " << konto.stanKonta_ << " PLN, Stan konta: "
+           << (konto.stan_ == Stan::dostepne ? "Dostępne" : "Niedostępne") << ", Właściciel: " << konto.klient_.getNazwa();
+        return os;
+    }
+};
+
+int KontoBankowe::licznikAktywnych = 0;
+
+class KontoOszczednosciowe : public KontoBankowe {
+private:
+    double stopaOprocentowania_;
+
+public:
+    KontoOszczednosciowe(double stopaOprocentowania, const char* nrKonta, double stanKonta, Stan stan, Klient& klient)
+        : KontoBankowe(nrKonta, stanKonta, stan, klient), stopaOprocentowania_(stopaOprocentowania) {
+        if (stopaOprocentowania_ < 0) {
+            throw std::invalid_argument("Stopa oprocentowania nie może być ujemna.");
+        }
+    }
+
+    double getStopaOprocentowania() const {
+        return stopaOprocentowania_;
+    }
+
+    void setStopaOprocentowania(double stopaOprocentowania) {
+        if (stopaOprocentowania < 0) {
+            throw std::invalid_argument("Stopa oprocentowania nie może być ujemna.");
+        }
+        stopaOprocentowania_ = stopaOprocentowania;
+    }
+
+    double prognoza() const override {
+        return getStanKonta() * (1 + stopaOprocentowania_);
+    }
+
+    // Operator == do porównywania dwóch kont oszczędnościowych
+    bool operator==(const KontoOszczednosciowe& inne) const {
+        if (getNrKonta() == inne.getNrKonta() &&
+            getStanKonta() == inne.getStanKonta() &&
+            getStan() == inne.getStan() &&
+            getKlient().getNazwa() == inne.getKlient().getNazwa() &&
+            getStopaOprocentowania() == inne.getStopaOprocentowania()) {
+            return true;
+        } else {
+            throw std::invalid_argument("Konta są identyczne, ale mają różne typy.");
+        }
     }
 };
 
 int main() {
     try {
-        Wlasciciel wlasciciel;
+        Klient klient1("Jan Kowalski");
+        KontoBankowe konto1("12345678901234567890123456", 1000.0, Stan::dostepne, klient1);
+        KontoOszczednosciowe konto2(0.05, "12345678901234567890123457", 2000.0, Stan::dostepne, klient1);
 
-        Samochod wzorcowy("XYZ-12345", 100000, StanDopuszczenia::dopuszczony, wlasciciel);
-        Samochod::setWzorcowy(&wzorcowy);
+        std::cout << konto1 << std::endl;
+        std::cout << konto2 << std::endl;
 
-        Samochod nowySamochod;
-        std::cout << "Nowy Samochod: " << static_cast<double>(nowySamochod) << " PLN" << std::endl;
-        std::cout << "Opis: " << nowySamochod.opis() << std::endl;
+        konto1 += 500.0;
+        std::cout << "Stan konta po wpłacie: " << konto1 << std::endl;
 
-        SamochodElektryczny elektryczny("ELE-98765", 50000, StanDopuszczenia::dopuszczony, wlasciciel, 80);
-        std::cout << "Samochod Elektryczny: " << static_cast<double>(elektryczny) << " PLN" << std::endl;
-        std::cout << "Opis: " << elektryczny.opis() << std::endl;
+        std::cout << "Prognoza stanu konta bankowego za rok: " << konto1.prognoza() << " PLN" << std::endl;
+        std::cout << "Prognoza stanu konta oszczędnościowego za rok: " << konto2.prognoza() << " PLN" << std::endl;
 
-    }
-    catch (const std::exception& e) {
-        std::cerr << "Blad: " << e.what() << std::endl;
+    } catch (const std::exception& e) {
+        std::cerr << "Błąd: " << e.what() << std::endl;
     }
 
     return 0;
 }
+
